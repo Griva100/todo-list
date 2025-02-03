@@ -3,9 +3,9 @@ import axios from 'axios';
 
 function App() {
   const [tasks, setTasks] = useState([]);
-  const [newTask, setNewTask] = useState('');
-  const [editedTaskId, setEditedTaskId] = useState(null);
-  const [editedText, setEditedText] = useState('');
+  const [title, setTitle] = useState('');
+  const [image, setImage] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
 
   // Fetch tasks from the backend
   useEffect(() => {
@@ -14,53 +14,85 @@ function App() {
         setTasks(response.data);
       })
       .catch(error => console.log(error));
-  }, []);
+  }, [tasks]);
 
   // Handle change in task input field
   const handleInputChange = (e) => {
-    setNewTask(e.target.value);
+    setTitle(e.target.value);
   };
+  // Handle change in task image
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
 
+    if (file && file.type.startsWith('image/')) {
+      setImage(file);
+    } else {
+      alert('Please select a valid image file.');
+      e.target.value = ''; // Reset file input if invalid
+    }
+  };
   // Handle task creation
-  const handleCreateTask = () => {
-    if (newTask) {
-      axios.post('http://localhost:5000/tasks', { text: newTask })
-        .then(response => {
-          setTasks([...tasks, response.data]);
-          setNewTask('');
-        })
-        .catch(error => console.log(error));
+  const handleCreateTask = async (e) => {
+    e.preventDefault();
+
+    if (!title || !image) {
+      alert('Title and Image are required!');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('title', title);
+    formData.append('image', image);
+
+    try {
+      const response = await axios.post('http://localhost:5000/tasks', formData);
+      setTasks([...tasks, response.data]);
+      setTitle('');
+      setImage(null);
+
+      // Reset file input field
+      document.getElementById('fileInput').value = '';
+    } catch (error) {
+      console.error('Error creating task', error);
     }
   };
 
   // Handle task deletion
-  const handleDeleteTask = (taskId) => {
-    axios.delete(`http://localhost:5000/tasks/${taskId}`)
-      .then(() => {
-        setTasks(tasks.filter(task => task._id !== taskId));
-      })
-      .catch(error => console.log(error));
+  const handleDeleteTask = async (taskId) => {
+    try {
+      await axios.delete(`http://localhost:5000/tasks/${taskId}`);
+      setTasks(tasks.filter(task => task._id !== taskId));
+    } catch (error) {
+      console.error('Error deleting task', error);
+    }
   };
 
-  // Set up for editing a task
-  const handleEditClick = (taskId, currentText) => {
-    setEditedTaskId(taskId);
-    setEditedText(currentText);
+  // Start editing a task
+  const handleEditClick = (task) => {
+    setEditingTask(task);
+    setTitle(task.title);
+    setImage(null); // Reset image state, keeping existing image
   };
 
   // Handle updating the task
-  const handleUpdateTask = () => {
-    if (editedText) {
-      axios.put(`http://localhost:5000/tasks/${editedTaskId}`, { text: editedText })
-        .then(response => {
-          setTasks(tasks.map(task => 
-            task._id === editedTaskId ? { ...task, text: editedText } : task
-          ));
-          setEditedTaskId(null);
-          setEditedText('');
-        })
-        .catch(error => console.log(error));
-    }
+  const handleUpdateTask = (e) => {
+    e.preventDefault();
+
+    if (!editingTask) return;
+
+    const formData = new FormData();
+    formData.append("title", title);
+    if (image) formData.append("image", image); // Only add if new image is selected
+
+    axios.put(`http://localhost:5000/tasks/${editingTask._id}`, formData)
+      .then(response => {
+        setTasks(tasks.map(task => (task._id === editingTask._id ? response.data : task)));
+        setEditingTask(null);
+        setTitle("");
+        setImage(null);
+        document.getElementById("fileInput").value = ""; // Reset file input
+      })
+      .catch(error => console.error(error));
   };
 
   return (
@@ -68,34 +100,50 @@ function App() {
       <h1>To-Do List</h1>
 
       {/* Create Task */}
-      <input
-        type="text"
-        value={newTask}
-        onChange={handleInputChange}
-        placeholder="Add a new task"
-      />
-      <button onClick={handleCreateTask}>Add Task</button>
+      {!editingTask ? (
+        <form onSubmit={handleCreateTask}>
+          <input
+            type="text"
+            value={title}
+            onChange={handleInputChange}
+            placeholder="Task title"
+          />
+          <input
+            type="file"
+            id="fileInput"
+            accept="image/*"
+            onChange={handleImageChange}
+          />
+          <button type="submit">Add Task</button>
+        </form>
+      ) : (
+        <form onSubmit={handleUpdateTask}>
+          <input
+            type="text"
+            value={title}
+            onChange={handleInputChange}
+          />
+          <input
+            type="file"
+            id="fileInput"
+            accept="image/*"
+            onChange={handleImageChange}
+          />
+          <button type="submit">Update Task</button>
+          <button type="button" onClick={() => setEditingTask(null)}>Cancel</button>
+        </form>
+      )}
 
       {/* Task List */}
       <ul>
         {tasks.map((task) => (
           <li key={task._id}>
-            {editedTaskId === task._id ? (
-              <>
-                <input
-                  type="text"
-                  value={editedText}
-                  onChange={(e) => setEditedText(e.target.value)}
-                />
-                <button onClick={handleUpdateTask}>Update</button>
-              </>
-            ) : (
-              <>
-                {task.text}
-                <button onClick={() => handleEditClick(task._id, task.text)}>Edit</button>
-                <button onClick={() => handleDeleteTask(task._id)}>Delete</button>
-              </>
+            <h3>{task.title}</h3>
+            {task.image && (
+              <img src={`http://localhost:5000/${task.image}`} alt="Task" width="100px" />
             )}
+            <button onClick={() => handleEditClick(task)}>Edit</button>
+            <button onClick={() => handleDeleteTask(task._id)}>Delete</button>
           </li>
         ))}
       </ul>
