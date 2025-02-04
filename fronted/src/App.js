@@ -71,7 +71,7 @@ function App() {
   const handleEditClick = (task) => {
     setEditingTask(task);
     setTitle(task.title);
-    setImage(null); // Reset image state, keeping existing image
+    setImage(null); 
   };
 
   // Handle updating the task
@@ -95,13 +95,20 @@ function App() {
       .catch(error => console.error(error));
   };
 
+  // Handle canceling edit
+  const handleCancelEdit = () => {
+    setEditingTask(null);
+    setTitle('');
+    setImage(null);
+    document.getElementById('fileInput').value = '';
+  };
+
   return (
     <div className="App">
       <h1>To-Do List</h1>
 
-      {/* Create Task */}
-      {!editingTask ? (
-        <form onSubmit={handleCreateTask}>
+       {/* Create or Edit Task */}
+       <form onSubmit={editingTask ? handleUpdateTask : handleCreateTask}>
           <input
             type="text"
             value={title}
@@ -114,25 +121,10 @@ function App() {
             accept="image/*"
             onChange={handleImageChange}
           />
-          <button type="submit">Add Task</button>
-        </form>
-      ) : (
-        <form onSubmit={handleUpdateTask}>
-          <input
-            type="text"
-            value={title}
-            onChange={handleInputChange}
-          />
-          <input
-            type="file"
-            id="fileInput"
-            accept="image/*"
-            onChange={handleImageChange}
-          />
-          <button type="submit">Update Task</button>
-          <button type="button" onClick={() => setEditingTask(null)}>Cancel</button>
-        </form>
-      )}
+        
+        <button type="submit">{editingTask ? "Update Task" : "Add Task"}</button>
+        {editingTask && <button type="button" onClick={handleCancelEdit}>Cancel</button>}
+      </form>
 
       {/* Task List */}
       <ul>
